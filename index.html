@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Fox Driving Game</title>
+<title>Fox Driving Game (빠른 속도)</title>
 <style>
     body { margin: 0; overflow: hidden; background: #000; }
     canvas { display: block; margin: 0 auto; background: #333; }
@@ -46,7 +46,7 @@ let fox = { x: 360, y: 1100, width: 80, height: 80 };
 let items = [];
 let score = 0;
 let timeLeft = 60;
-let gameSpeed = 2;
+let gameSpeed = 4;  // 기본 속도 ×2
 let gameInterval, spawnInterval, countdownInterval;
 
 function spawnItem() {
@@ -68,10 +68,10 @@ function spawnItem() {
 }
 
 function updateGameSpeed() {
-    if (timeLeft <= 10) gameSpeed = 8;
-    else if (timeLeft <= 20) gameSpeed = 6;
-    else if (timeLeft <= 30) gameSpeed = 4;
-    else if (timeLeft <= 50) gameSpeed = 3;
+    if (timeLeft <= 10) gameSpeed = 16;
+    else if (timeLeft <= 20) gameSpeed = 12;
+    else if (timeLeft <= 30) gameSpeed = 8;
+    else if (timeLeft <= 50) gameSpeed = 6;
 }
 
 function update() {
@@ -129,7 +129,7 @@ function restartGame() {
     fox.x = 360;
     score = 0;
     timeLeft = 60;
-    gameSpeed = 2;
+    gameSpeed = 4;
     items = [];
     overlay.style.display = 'none';
     startGame();
