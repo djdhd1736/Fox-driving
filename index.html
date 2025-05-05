@@ -4,18 +4,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Fox Driving Game (빠른 속도)</title>
+<title>Fox Driving Game (따당 추가)</title>
 <style>
     body { margin: 0; overflow: hidden; background: #000; }
     canvas { display: block; margin: 0 auto; background: #333; }
-    #overlay {
+    #start-menu, #overlay {
         position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        color: white; font-size: 24px; text-align: center; display: none;
+        color: white; font-size: 24px; text-align: center;
+    }
+    #overlay { display: none; }
+    #dadang-status {
+        position: absolute; top: 10px; right: 20px; color: yellow; font-size: 20px;
     }
 </style>
 </head>
 <body>
-<canvas id="gameCanvas" width="720" height="1280"></canvas>
+<div id="start-menu">
+    <div>오늘의 운행 컨셉은?</div><br>
+    <button id="short-trip">1. 단거리 (평균 속도)</button><br><br>
+    <button id="long-trip">2. 장거리 (4배 속도)</button>
+</div>
+
+<canvas id="gameCanvas" width="720" height="1280" style="display:none;"></canvas>
+<div id="dadang-status"></div>
+
 <div id="overlay">
     <div id="game-over-text">게임 종료!</div>
     <div id="final-score"></div>
@@ -25,15 +37,20 @@
     <h3>순위표</h3>
     <ol id="ranking"></ol>
 </div>
+
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const startMenu = document.getElementById('start-menu');
 const overlay = document.getElementById('overlay');
 const finalScoreDiv = document.getElementById('final-score');
 const restartBtn = document.getElementById('restart');
 const submitBtn = document.getElementById('submit-score');
 const nicknameInput = document.getElementById('nickname');
 const rankingList = document.getElementById('ranking');
+const dadangStatus = document.getElementById('dadang-status');
+const shortBtn = document.getElementById('short-trip');
+const longBtn = document.getElementById('long-trip');
 
 const foxImg = new Image(); foxImg.src = 'https://i.imgur.com/0wmMQJJ.png';
 const poopImg = new Image(); poopImg.src = 'https://i.imgur.com/AgEh2ev.png';
@@ -46,16 +63,20 @@ let fox = { x: 360, y: 1100, width: 80, height: 80 };
 let items = [];
 let score = 0;
 let timeLeft = 60;
-let gameSpeed = 4;  // 기본 속도 ×2
+let baseSpeed = 2;
+let gameSpeed = baseSpeed;
+let isDadang = false;
+let dadangTimer = 0;
 let gameInterval, spawnInterval, countdownInterval;
 
 function spawnItem() {
     const types = [
-        { img: poopImg, value: -10000, chance: 0.4 },
-        { img: honeyImg, value: 1000, chance: 0.4 },
+        { img: poopImg, value: -10000, chance: 0.35 },
+        { img: honeyImg, value: 1000, chance: 0.35 },
         { img: vipImg, value: 10000, chance: 0.05 },
         { img: angryImg, value: -20000, chance: 0.1 },
         { img: tipImg, value: 2000, chance: 0.05 },
+        { img: null, value: 0, chance: 0.1, isDadang: true }, // 따당 아이템
     ];
     let rand = Math.random(), sum = 0;
     for (let type of types) {
@@ -68,10 +89,10 @@ function spawnItem() {
 }
 
 function updateGameSpeed() {
-    if (timeLeft <= 10) gameSpeed = 16;
-    else if (timeLeft <= 20) gameSpeed = 12;
-    else if (timeLeft <= 30) gameSpeed = 8;
-    else if (timeLeft <= 50) gameSpeed = 6;
+    if (timeLeft <= 10) gameSpeed = baseSpeed * 4;
+    else if (timeLeft <= 20) gameSpeed = baseSpeed * 3;
+    else if (timeLeft <= 30) gameSpeed = baseSpeed * 2;
+    else if (timeLeft <= 50) gameSpeed = baseSpeed * 1.5;
 }
 
 function update() {
@@ -80,7 +101,14 @@ function update() {
 
     items.forEach(item => {
         item.y += gameSpeed;
-        ctx.drawImage(item.type.img, item.x, item.y, item.width, item.height);
+        if (item.type.isDadang) {
+            ctx.fillStyle = 'orange';
+            ctx.beginPath();
+            ctx.arc(item.x + 25, item.y + 25, 25, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.drawImage(item.type.img, item.x, item.y, item.width, item.height);
+        }
     });
 
     items = items.filter(item => {
@@ -90,11 +118,27 @@ function update() {
             item.y < fox.y + fox.height &&
             item.y + item.height > fox.y
         ) {
-            score += item.type.value;
+            if (item.type.isDadang) {
+                isDadang = true;
+                dadangTimer = 5 * 60; // 5초 효과
+            } else {
+                let gain = item.type.value;
+                if (isDadang) gain *= 2;
+                score += gain;
+            }
             return false;
         }
         return item.y <= canvas.height;
     });
+
+    if (isDadang) {
+        dadangStatus.textContent = '따당 ON!';
+        dadangTimer--;
+        if (dadangTimer <= 0) {
+            isDadang = false;
+            dadangStatus.textContent = '';
+        }
+    }
 
     ctx.fillStyle = 'white';
     ctx.font = '30px Arial';
@@ -108,6 +152,8 @@ function gameLoop() {
 }
 
 function startGame() {
+    document.getElementById('start-menu').style.display = 'none';
+    canvas.style.display = 'block';
     gameInterval = setInterval(gameLoop, 30);
     spawnInterval = setInterval(spawnItem, 700);
     countdownInterval = setInterval(() => {
@@ -129,7 +175,9 @@ function restartGame() {
     fox.x = 360;
     score = 0;
     timeLeft = 60;
-    gameSpeed = 4;
+    gameSpeed = baseSpeed;
+    isDadang = false;
+    dadangTimer = 0;
     items = [];
     overlay.style.display = 'none';
     startGame();
@@ -165,7 +213,15 @@ submitBtn.addEventListener('click', () => {
     nicknameInput.value = '';
 });
 
-startGame();
+shortBtn.addEventListener('click', () => {
+    baseSpeed = 2;
+    startGame();
+});
+
+longBtn.addEventListener('click', () => {
+    baseSpeed = 8;
+    startGame();
+});
 </script>
 </body>
 </html>
