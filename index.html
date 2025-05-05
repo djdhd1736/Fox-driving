@@ -1,0 +1,113 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>여우 콜잡기 게임</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background: url('https://imgur.com/pj2lc2g.png') no-repeat center center;
+            background-size: cover;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="1080" height="1920"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const foxImg = new Image();
+        foxImg.src = 'https://i.imgur.com/0wmMQJJ.png';
+
+        const poopImg = new Image();
+        poopImg.src = 'https://i.imgur.com/AgEh2ev.png';
+
+        const honeyImg = new Image();
+        honeyImg.src = 'https://i.imgur.com/8wFZQR1.png';
+
+        const vipImg = new Image();
+        vipImg.src = 'https://i.imgur.com/4JQsYja.png';
+
+        const angryImg = new Image();
+        angryImg.src = 'https://i.imgur.com/yuZn35z.png';
+
+        const tipImg = new Image();
+        tipImg.src = 'https://i.imgur.com/hJIFKB6.png';
+
+        let fox = { x: canvas.width / 2, y: canvas.height - 150, width: 100, height: 100, speed: 20 };
+        let items = [];
+        let score = 0;
+        let timeLeft = 60;
+
+        function spawnItem() {
+            const rand = Math.random();
+            let type, img, value;
+            if (rand < 0.05) { type = 'vip'; img = vipImg; value = 10000; }
+            else if (rand < 0.15) { type = 'angry'; img = angryImg; value = -20000; }
+            else if (rand < 0.25) { type = 'tip'; img = tipImg; value = 2000; }
+            else if (rand < 0.65) { type = 'poop'; img = poopImg; value = -10000; }
+            else { type = 'honey'; img = honeyImg; value = 1000; }
+
+            items.push({
+                x: Math.random() * (canvas.width - 50),
+                y: -50,
+                width: 50,
+                height: 50,
+                img: img,
+                value: value
+            });
+        }
+
+        function update() {
+            items.forEach(item => item.y += 5);
+            items = items.filter(item => item.y < canvas.height);
+
+            items.forEach(item => {
+                if (item.x < fox.x + fox.width &&
+                    item.x + item.width > fox.x &&
+                    item.y < fox.y + fox.height &&
+                    item.y + item.height > fox.y) {
+                    score += item.value;
+                    item.y = canvas.height + 1;
+                }
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(foxImg, fox.x, fox.y, fox.width, fox.height);
+            items.forEach(item => ctx.drawImage(item.img, item.x, item.y, item.width, item.height));
+            ctx.fillStyle = 'white';
+            ctx.font = '48px sans-serif';
+            ctx.fillText('매출: ' + score + '원', 20, 50);
+            ctx.fillText('남은시간: ' + timeLeft, 20, 110);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+        }
+
+        setInterval(spawnItem, 800);
+        setInterval(gameLoop, 30);
+        setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 0) {
+                alert('게임 종료! 최종 매출: ' + score + '원');
+                document.location.reload();
+            }
+        }, 1000);
+
+        document.addEventListener('touchmove', e => {
+            let touch = e.touches[0];
+            fox.x = touch.clientX - fox.width / 2;
+        });
+    </script>
+</body>
+</html>
