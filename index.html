@@ -2,112 +2,110 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>여우 콜잡기 게임</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-        }
-        canvas {
-            display: block;
-            background: url('https://imgur.com/pj2lc2g.png') no-repeat center center;
-            background-size: cover;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>Fox Driving Game</title>
+<style>
+    body { margin: 0; overflow: hidden; background: black; }
+    canvas { display: block; margin: 0 auto; background: url('https://i.imgur.com/pj2lc2g.png'); background-size: cover; }
+</style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="1080" height="1920"></canvas>
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 360;
+canvas.height = 640;
 
-        const foxImg = new Image();
-        foxImg.src = 'https://i.imgur.com/0wmMQJJ.png';
+let foxImg = new Image();
+foxImg.src = 'https://i.imgur.com/0wmMQJJ.png';
 
-        const poopImg = new Image();
-        poopImg.src = 'https://i.imgur.com/AgEh2ev.png';
+let poopImg = new Image();
+poopImg.src = 'https://i.imgur.com/AgEh2ev.png';
 
-        const honeyImg = new Image();
-        honeyImg.src = 'https://i.imgur.com/8wFZQR1.png';
+let honeyImg = new Image();
+honeyImg.src = 'https://i.imgur.com/8wFZQR1.png';
 
-        const vipImg = new Image();
-        vipImg.src = 'https://i.imgur.com/4JQsYja.png';
+let vipImg = new Image();
+vipImg.src = 'https://i.imgur.com/4JQsYja.png';
 
-        const angryImg = new Image();
-        angryImg.src = 'https://i.imgur.com/yuZn35z.png';
+let angryImg = new Image();
+angryImg.src = 'https://i.imgur.com/yuZn35z.png';
 
-        const tipImg = new Image();
-        tipImg.src = 'https://i.imgur.com/hJIFKB6.png';
+let tipImg = new Image();
+tipImg.src = 'https://i.imgur.com/hJIFKB6.png';
 
-        let fox = { x: canvas.width / 2, y: canvas.height - 150, width: 100, height: 100, speed: 20 };
-        let items = [];
-        let score = 0;
-        let timeLeft = 60;
+let fox = { x: canvas.width / 2 - 25, y: canvas.height - 70, width: 50, height: 50 };
+let items = [];
+let score = 0;
+let timeLeft = 60;
+let gameSpeed = 2;
 
-        function spawnItem() {
-            const rand = Math.random();
-            let type, img, value;
-            if (rand < 0.05) { type = 'vip'; img = vipImg; value = 10000; }
-            else if (rand < 0.15) { type = 'angry'; img = angryImg; value = -20000; }
-            else if (rand < 0.25) { type = 'tip'; img = tipImg; value = 2000; }
-            else if (rand < 0.65) { type = 'poop'; img = poopImg; value = -10000; }
-            else { type = 'honey'; img = honeyImg; value = 1000; }
-
+function spawnItem() {
+    const types = [
+        { img: poopImg, value: -10000, chance: 0.4 },
+        { img: honeyImg, value: 1000, chance: 0.4 },
+        { img: vipImg, value: 10000, chance: 0.05 },
+        { img: angryImg, value: -20000, chance: 0.1 },
+        { img: tipImg, value: 2000, chance: 0.05 },
+    ];
+    let rand = Math.random();
+    let sum = 0;
+    for (let type of types) {
+        sum += type.chance;
+        if (rand < sum) {
             items.push({
-                x: Math.random() * (canvas.width - 50),
-                y: -50,
-                width: 50,
-                height: 50,
-                img: img,
-                value: value
+                img: type.img,
+                x: Math.random() * (canvas.width - 30),
+                y: -30,
+                width: 30,
+                height: 30,
+                value: type.value
             });
+            break;
         }
+    }
+}
 
-        function update() {
-            items.forEach(item => item.y += 5);
-            items = items.filter(item => item.y < canvas.height);
+document.addEventListener('touchmove', function(e) {
+    fox.x = e.touches[0].clientX - fox.width / 2;
+});
 
-            items.forEach(item => {
-                if (item.x < fox.x + fox.width &&
-                    item.x + item.width > fox.x &&
-                    item.y < fox.y + fox.height &&
-                    item.y + item.height > fox.y) {
-                    score += item.value;
-                    item.y = canvas.height + 1;
-                }
-            });
+function updateGameSpeed() {
+    if (timeLeft <= 10) gameSpeed = 8;
+    else if (timeLeft <= 20) gameSpeed = 6;
+    else if (timeLeft <= 30) gameSpeed = 4;
+    else if (timeLeft <= 50) gameSpeed = 3;
+}
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(foxImg, fox.x, fox.y, fox.width, fox.height);
+
+    for (let item of items) {
+        item.y += gameSpeed;
+        ctx.drawImage(item.img, item.x, item.y, item.width, item.height);
+        if (item.y + item.height > fox.y && item.x < fox.x + fox.width && item.x + item.width > fox.x) {
+            score += item.value;
+            items.splice(items.indexOf(item), 1);
+        } else if (item.y > canvas.height) {
+            items.splice(items.indexOf(item), 1);
         }
+    }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(foxImg, fox.x, fox.y, fox.width, fox.height);
-            items.forEach(item => ctx.drawImage(item.img, item.x, item.y, item.width, item.height));
-            ctx.fillStyle = 'white';
-            ctx.font = '48px sans-serif';
-            ctx.fillText('매출: ' + score + '원', 20, 50);
-            ctx.fillText('남은시간: ' + timeLeft, 20, 110);
-        }
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.fillText('오늘의 매출: ' + score + '원', 10, 30);
+    ctx.fillText('남은 시간: ' + timeLeft + '초', 10, 60);
 
-        function gameLoop() {
-            update();
-            draw();
-        }
+    updateGameSpeed();
+    if (timeLeft > 0) requestAnimationFrame(gameLoop);
+    else ctx.fillText('게임 종료!', canvas.width / 2 - 50, canvas.height / 2);
+}
 
-        setInterval(spawnItem, 800);
-        setInterval(gameLoop, 30);
-        setInterval(() => {
-            timeLeft--;
-            if (timeLeft <= 0) {
-                alert('게임 종료! 최종 매출: ' + score + '원');
-                document.location.reload();
-            }
-        }, 1000);
-
-        document.addEventListener('touchmove', e => {
-            let touch = e.touches[0];
-            fox.x = touch.clientX - fox.width / 2;
-        });
-    </script>
+setInterval(spawnItem, 800);
+setInterval(() => { if (timeLeft > 0) timeLeft--; }, 1000);
+gameLoop();
+</script>
 </body>
 </html>
