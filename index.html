@@ -3,108 +3,125 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Fox Driving Game</title>
 <style>
-    body { margin: 0; overflow: hidden; background: black; }
-    canvas { display: block; margin: 0 auto; background: url('https://i.imgur.com/pj2lc2g.png'); background-size: cover; }
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: #222;
+    }
+    canvas {
+        display: block;
+        margin: 0 auto;
+        background: url('https://imgur.com/pj2lc2g.png') no-repeat center center;
+        background-size: cover;
+    }
 </style>
 </head>
 <body>
-<canvas id="gameCanvas"></canvas>
+<canvas id="gameCanvas" width="1080" height="1920"></canvas>
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = 360;
-canvas.height = 640;
 
-let foxImg = new Image();
+const foxImg = new Image();
 foxImg.src = 'https://i.imgur.com/0wmMQJJ.png';
-
-let poopImg = new Image();
-poopImg.src = 'https://i.imgur.com/AgEh2ev.png';
-
-let honeyImg = new Image();
+const poopImg = new Image();
+poopImg.src = 'https://i.imgur.com/H6RmSzx.png';
+const honeyImg = new Image();
 honeyImg.src = 'https://i.imgur.com/8wFZQR1.png';
-
-let vipImg = new Image();
+const vipImg = new Image();
 vipImg.src = 'https://i.imgur.com/4JQsYja.png';
-
-let angryImg = new Image();
+const angryImg = new Image();
 angryImg.src = 'https://i.imgur.com/yuZn35z.png';
-
-let tipImg = new Image();
+const tipImg = new Image();
 tipImg.src = 'https://i.imgur.com/hJIFKB6.png';
 
-let fox = { x: canvas.width / 2 - 25, y: canvas.height - 70, width: 50, height: 50 };
-let items = [];
+let foxX = canvas.width / 2 - 50;
+let foxY = canvas.height - 150;
 let score = 0;
-let timeLeft = 60;
-let gameSpeed = 2;
+let time = 60;
+let speedMultiplier = 1;
+let items = [];
 
 function spawnItem() {
-    const types = [
-        { img: poopImg, value: -10000, chance: 0.4 },
-        { img: honeyImg, value: 1000, chance: 0.4 },
-        { img: vipImg, value: 10000, chance: 0.05 },
-        { img: angryImg, value: -20000, chance: 0.1 },
-        { img: tipImg, value: 2000, chance: 0.05 },
-    ];
-    let rand = Math.random();
-    let sum = 0;
-    for (let type of types) {
-        sum += type.chance;
-        if (rand < sum) {
-            items.push({
-                img: type.img,
-                x: Math.random() * (canvas.width - 30),
-                y: -30,
-                width: 30,
-                height: 30,
-                value: type.value
-            });
-            break;
-        }
-    }
+    const typeChance = Math.random();
+    let type = 'poop';
+    if (typeChance < 0.05) type = 'vip';
+    else if (typeChance < 0.25) type = Math.random() < 0.5 ? 'angry' : 'tip';
+    else if (typeChance < 0.65) type = 'honey';
+
+    items.push({
+        x: Math.random() * (canvas.width - 50),
+        y: -50,
+        type: type
+    });
 }
 
-document.addEventListener('touchmove', function(e) {
-    fox.x = e.touches[0].clientX - fox.width / 2;
-});
+function update() {
+    time -= 1 / 60;
+    if (time <= 0) {
+        alert('게임 종료! 최종 매출: ' + score + '원');
+        document.location.reload();
+    }
 
-function updateGameSpeed() {
-    if (timeLeft <= 10) gameSpeed = 8;
-    else if (timeLeft <= 20) gameSpeed = 6;
-    else if (timeLeft <= 30) gameSpeed = 4;
-    else if (timeLeft <= 50) gameSpeed = 3;
+    if (time <= 10) speedMultiplier = 4;
+    else if (time <= 20) speedMultiplier = 3;
+    else if (time <= 30) speedMultiplier = 2;
+    else if (time <= 50) speedMultiplier = 1.5;
+
+    items.forEach(item => item.y += 4 * speedMultiplier);
+
+    items = items.filter(item => {
+        if (item.y > canvas.height) return false;
+        if (
+            item.x < foxX + 100 &&
+            item.x + 50 > foxX &&
+            item.y < foxY + 100 &&
+            item.y + 50 > foxY
+        ) {
+            if (item.type === 'poop') score -= 10000;
+            else if (item.type === 'honey') score += 1000;
+            else if (item.type === 'vip') score += 10000;
+            else if (item.type === 'angry') score -= 20000;
+            else if (item.type === 'tip') score += 2000;
+            return false;
+        }
+        return true;
+    });
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(foxImg, foxX, foxY, 100, 100);
+
+    items.forEach(item => {
+        let img = poopImg;
+        if (item.type === 'honey') img = honeyImg;
+        else if (item.type === 'vip') img = vipImg;
+        else if (item.type === 'angry') img = angryImg;
+        else if (item.type === 'tip') img = tipImg;
+        ctx.drawImage(img, item.x, item.y, 50, 50);
+    });
+
+    ctx.fillStyle = 'white';
+    ctx.font = '48px Arial';
+    ctx.fillText('매출: ' + score + '원', 20, 60);
+    ctx.fillText('남은시간: ' + Math.floor(time), 20, 120);
 }
 
 function gameLoop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(foxImg, fox.x, fox.y, fox.width, fox.height);
-
-    for (let item of items) {
-        item.y += gameSpeed;
-        ctx.drawImage(item.img, item.x, item.y, item.width, item.height);
-        if (item.y + item.height > fox.y && item.x < fox.x + fox.width && item.x + item.width > fox.x) {
-            score += item.value;
-            items.splice(items.indexOf(item), 1);
-        } else if (item.y > canvas.height) {
-            items.splice(items.indexOf(item), 1);
-        }
-    }
-
-    ctx.fillStyle = 'white';
-    ctx.font = '20px Arial';
-    ctx.fillText('오늘의 매출: ' + score + '원', 10, 30);
-    ctx.fillText('남은 시간: ' + timeLeft + '초', 10, 60);
-
-    updateGameSpeed();
-    if (timeLeft > 0) requestAnimationFrame(gameLoop);
-    else ctx.fillText('게임 종료!', canvas.width / 2 - 50, canvas.height / 2);
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
 }
 
-setInterval(spawnItem, 800);
-setInterval(() => { if (timeLeft > 0) timeLeft--; }, 1000);
+canvas.addEventListener('touchstart', function(e) {
+    foxX = e.touches[0].clientX - 50;
+});
+
+setInterval(spawnItem, 500);
 gameLoop();
 </script>
 </body>
