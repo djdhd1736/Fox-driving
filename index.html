@@ -2,226 +2,266 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Fox Driving Game (따당 추가)</title>
-<style>
-    body { margin: 0; overflow: hidden; background: #000; }
-    canvas { display: block; margin: 0 auto; background: #333; }
-    #start-menu, #overlay {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        color: white; font-size: 24px; text-align: center;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>새달사 슬롯머신 통합버전</title>
+  <style>
+    body { background: #111; color: #fff; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
+    .slot-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 90vw; margin: auto; }
+    .slot-cell { background: #222; border-radius: 6px; overflow: hidden; aspect-ratio: 1/1; display: flex; justify-content: center; align-items: center; }
+    .slot-symbol { width: 80%; height: 80%; object-fit: contain; animation: spinSymbol 0.4s ease-in-out; }
+    @keyframes spinSymbol {
+      0% { transform: rotateX(0deg) scale(0.5); opacity: 0.2; }
+      100% { transform: rotateX(360deg) scale(1); opacity: 1; }
     }
-    #overlay { display: none; }
-    #dadang-status {
-        position: absolute; top: 10px; right: 20px; color: yellow; font-size: 20px;
+    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+    #result, #ranking, #stats { margin-top: 10px; font-size: 18px; }
+    @media (max-width: 600px) {
+      .slot-container { gap: 4px; }
     }
+  
+.slot-symbol.win {
+  border: 3px solid gold;
+  box-shadow: 0 0 10px gold;
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 </style>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCxRz9AGs1ADcSDkXSRwpxQj6J6T5U0Rls",
+    authDomain: "daeri-b48bb.firebaseapp.com",
+    projectId: "daeri-b48bb",
+    storageBucket: "daeri-b48bb.firebasestorage.app",
+    messagingSenderId: "354494373374",
+    appId: "1:354494373374:web:6f204c79027ddc020974af"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window.submitRanking = async function(name, score) {
+    await addDoc(collection(db, "rankings"), {
+      name: name,
+      score: score,
+      timestamp: Date.now()
+    });
+    loadRanking();
+  }
+
+  window.loadRanking = async function() {
+    const snapshot = await getDocs(query(collection(db, "rankings"), orderBy("score", "desc"), limit(5)));
+    const list = [];
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      list.push(`<li>${d.name} - ${d.score.toLocaleString()}원</li>`);
+    });
+    document.getElementById("ranking-list").innerHTML = "<ol>" + list.join("") + "</ol>";
+  }
+
+  window.addEventListener("DOMContentLoaded", loadRanking);
+</script>
+
 </head>
 <body>
-<div id="start-menu">
-    <div>오늘의 운행 컨셉은?</div><br>
-    <button id="short-trip">1. 단거리 (평균 속도)</button><br><br>
-    <button id="long-trip">2. 장거리 (4배 속도)</button>
-</div>
+  <h1>새달사 복귀 슬롯머신</h1>
 
-<canvas id="gameCanvas" width="720" height="1280" style="display:none;"></canvas>
-<div id="dadang-status"></div>
+<audio id="spinSound" src="https://freesound.org/data/previews/449/449772_9141001-lq.mp3" preload="auto"></audio>
+<audio id="stopSound" src="https://freesound.org/data/previews/211/211683_2088639-lq.mp3" preload="auto"></audio>
+<audio id="winSound" src="https://freesound.org/data/previews/275/275156_5123851-lq.mp3" preload="auto"></audio>
 
-<div id="overlay">
-    <div id="game-over-text">게임 종료!</div>
-    <div id="final-score"></div>
-    <input type="text" id="nickname" placeholder="닉네임 입력"><br><br>
-    <button id="submit-score">순위 등록</button>
-    <button id="restart">다시하기</button>
-    <h3>순위표</h3>
-    <ol id="ranking"></ol>
-</div>
+  <div id="stats">코인: <span id="coins">5000</span> | 프리턴: <span id="freespins">0</span> | 라운드: <span id="round">1</span></div>
+  <div id="item-effect">아이템: 없음</div>
+  <div class="slot-container" id="grid"></div>
+  <button onclick="handleSpin()">돌리기</button>
+  <button onclick="toggleAuto()">자동: <span id="autotext">OFF</span></button>
+  <div id="result"></div>
+  <h3>실시간 랭킹</h3><div id="ranking-list"></div>
+<div id="ranking"></div>
+<div id="restart"><button onclick="location.reload()">재시작하기</button></div>
 
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const startMenu = document.getElementById('start-menu');
-const overlay = document.getElementById('overlay');
-const finalScoreDiv = document.getElementById('final-score');
-const restartBtn = document.getElementById('restart');
-const submitBtn = document.getElementById('submit-score');
-const nicknameInput = document.getElementById('nickname');
-const rankingList = document.getElementById('ranking');
-const dadangStatus = document.getElementById('dadang-status');
-const shortBtn = document.getElementById('short-trip');
-const longBtn = document.getElementById('long-trip');
+  <script>
+    const symbolData = {
+      "복귀콜": "https://i.imgur.com/4dvrd8S.jpeg",
+      "보너스": "https://i.imgur.com/j5Zadsd.jpeg",
+      "진상콜": "https://i.imgur.com/8Qtqzby.jpeg",
+      "착변콜": "https://i.imgur.com/O3pdLMQ.jpeg",
+      "콜마너": "https://i.imgur.com/MfsV9I7.jpeg",
+      "맞춤콜": "https://i.imgur.com/FA6ckxB.jpeg",
+      "경유콜": "https://i.imgur.com/BtUhkDe.jpeg",
+      "카카오": "https://i.imgur.com/c2kTBOB.jpeg",
+      "로지": "https://i.imgur.com/hcxF3cV.jpeg",
+      "티맵": "https://i.imgur.com/gVK4vgP.jpeg"
+    };
+    const symbols = Object.keys(symbolData);
+    const roundCosts = {1:0,2:20000,3:100000,4:300000,5:1000000};
 
-const foxImg = new Image(); foxImg.src = 'https://i.imgur.com/0wmMQJJ.png';
-const poopImg = new Image(); poopImg.src = 'https://i.imgur.com/AgEh2ev.png';
-const honeyImg = new Image(); honeyImg.src = 'https://i.imgur.com/8wFZQR1.png';
-const vipImg = new Image(); vipImg.src = 'https://i.imgur.com/4JQsYja.png';
-const angryImg = new Image(); angryImg.src = 'https://i.imgur.com/yuZn35z.png';
-const tipImg = new Image(); tipImg.src = 'https://i.imgur.com/hJIFKB6.png';
+    let coins = 5000;
+    let freespins = 0;
+    let round = 1;
+    let spinCount = 0;
+    let auto = false;
+    let activeItemEffects = [];
 
-let fox = { x: 360, y: 1100, width: 80, height: 80 };
-let items = [];
-let score = 0;
-let timeLeft = 60;
-let baseSpeed = 2;
-let gameSpeed = baseSpeed;
-let isDadang = false;
-let dadangTimer = 0;
-let gameInterval, spawnInterval, countdownInterval;
+    
+    const spinSound = document.getElementById("spinSound");
+    const stopSound = document.getElementById("stopSound");
+    const winSound = document.getElementById("winSound");
 
-function spawnItem() {
-    const types = [
-        { img: poopImg, value: -10000, chance: 0.35 },
-        { img: honeyImg, value: 1000, chance: 0.35 },
-        { img: vipImg, value: 10000, chance: 0.05 },
-        { img: angryImg, value: -20000, chance: 0.1 },
-        { img: tipImg, value: 2000, chance: 0.05 },
-        { img: null, value: 0, chance: 0.1, isDadang: true }, // 따당 아이템
-    ];
-    let rand = Math.random(), sum = 0;
-    for (let type of types) {
-        sum += type.chance;
-        if (rand < sum) {
-            items.push({ x: Math.random() * (canvas.width - 50), y: -50, width: 50, height: 50, type: type });
-            break;
-        }
+
+function highlightWinningSymbols(indices) {
+  document.querySelectorAll('.slot-symbol').forEach(el => el.classList.remove('win'));
+  indices.forEach(i => {
+    const el = document.querySelector(`.slot-symbol[data-index='${i}']`);
+    if (el) el.classList.add('win');
+  });
+}
+
+function updateStats() {
+      document.getElementById("coins").textContent = coins;
+      document.getElementById("freespins").textContent = freespins;
+      document.getElementById("round").textContent = round;
     }
+
+    function toggleAuto() {
+      auto = !auto;
+      document.getElementById("autotext").textContent = auto ? "ON" : "OFF";
+      if (auto) handleSpin();
+    }
+
+    function selectItem() {
+      const itemPool = [
+        { name:"복귀콜 확률 +5%", type:"probability", symbol:"복귀콜", boost:0.05 },
+        { name:"진상콜 등장 -50%", type:"probability", symbol:"진상콜", boost:-0.5 },
+        { name:"착변 보상 +50%", type:"reward", symbol:"착변콜", multiplier:1.5 },
+        { name:"보너스 프리턴 +1", type:"freespin", symbol:"보너스", bonus:1 }
+      ];
+      let msg = `라운드 ${round} 아이템 선택\n`;
+      itemPool.forEach((it, i) => msg += `${i+1}. ${it.name}\n`);
+      const pick = parseInt(prompt(msg));
+      const chosen = itemPool[pick-1];
+      if (chosen) {
+        activeItemEffects.push(chosen);
+        document.getElementById("item-effect").textContent = `아이템: ${chosen.name}`;
+      }
+    }
+
+    function handleSpin() {
+      spinSound.currentTime = 0;
+      spinSound.play();
+      if (spinCount === 0) {
+        const cost = roundCosts[round] || 0;
+        if (coins < cost) return alert(`라운드 ${round} 진입 실패. 코인 부족`);
+        coins -= cost;
+        selectItem();
+      }
+
+      if (freespins > 0) freespins--;
+      else if (coins >= 1000) coins -= 1000;
+      
+else {
+  auto = false;
+  const name = prompt("코인이 부족합니다. 닉네임을 입력해주세요:");
+  document.getElementById("ranking").innerHTML = `<h3>${name}님의 최종 코인: ${coins.toLocaleString()}원 (코인 부족으로 종료)</h3>`;
+  return;
 }
 
-function updateGameSpeed() {
-    if (timeLeft <= 10) gameSpeed = baseSpeed * 4;
-    else if (timeLeft <= 20) gameSpeed = baseSpeed * 3;
-    else if (timeLeft <= 30) gameSpeed = baseSpeed * 2;
-    else if (timeLeft <= 50) gameSpeed = baseSpeed * 1.5;
-}
 
-function update() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(foxImg, fox.x, fox.y, fox.width, fox.height);
+      spinCount++;
+      updateStats();
 
-    items.forEach(item => {
-        item.y += gameSpeed;
-        if (item.type.isDadang) {
-            ctx.fillStyle = 'orange';
-            ctx.beginPath();
-            ctx.arc(item.x + 25, item.y + 25, 25, 0, Math.PI * 2);
-            ctx.fill();
-        } else {
-            ctx.drawImage(item.type.img, item.x, item.y, item.width, item.height);
-        }
-    });
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      let result = [];
 
-    items = items.filter(item => {
-        if (
-            item.x < fox.x + fox.width &&
-            item.x + item.width > fox.x &&
-            item.y < fox.y + fox.height &&
-            item.y + item.height > fox.y
-        ) {
-            if (item.type.isDadang) {
-                isDadang = true;
-                dadangTimer = 5 * 60; // 5초 효과
-            } else {
-                let gain = item.type.value;
-                if (isDadang) gain *= 2;
-                score += gain;
+      for (let i = 0; i < 25; i++) {
+        let pool = [...symbols];
+        activeItemEffects.forEach(eff => {
+          if (eff.type === "probability" && Math.random() < Math.abs(eff.boost)) {
+            if (eff.boost > 0) pool.push(eff.symbol);
+            else pool = pool.filter(s => s !== eff.symbol);
+          }
+        });
+        const sym = pool[Math.floor(Math.random()*pool.length)];
+        result.push(sym);
+
+        const cell = document.createElement("div");
+        cell.className = "slot-cell";
+        const img = document.createElement("img");
+        img.className = "slot-symbol"; img.dataset.index = i;
+        img.src = symbolData[sym];
+        img.dataset.sym = sym;
+        cell.appendChild(img);
+        grid.appendChild(cell);
+      }
+
+      evaluate(result);
+    }
+
+    function evaluate(arr) {
+      let total = 0;
+      const lines = [];
+
+      for (let i = 0; i < 5; i++) lines.push(arr.slice(i*5, i*5+5));
+      for (let i = 0; i < 5; i++) lines.push([arr[i],arr[i+5],arr[i+10],arr[i+15],arr[i+20]]);
+      lines.push([arr[0],arr[6],arr[12],arr[18],arr[24]]);
+      lines.push([arr[4],arr[8],arr[12],arr[16],arr[20]]);
+
+      let bonusCount = 0;
+
+      let highlightIndices = [];
+    lines.forEach((line, lineIdx) => {
+        const count = {};
+        line.forEach(sym => count[sym] = (count[sym]||0)+1);
+        for (let sym in count) {
+          if (count[sym] >= 3) {
+            let base = sym==="복귀콜"?2000 : sym==="보너스"?1000 : sym==="진상콜"?-1000 : 800;
+            let mult = count[sym]===3?2 : count[sym]===4?3 : 4;
+            activeItemEffects.forEach(eff => {
+              if (eff.type === "reward" && eff.symbol === sym) mult *= eff.multiplier;
+              if (eff.type === "freespin" && eff.symbol === sym) freespins += eff.bonus;
+            });
+            if (sym === "보너스") bonusCount++;
+            const offset = lineIdx < 5 ? lineIdx * 5 : lineIdx < 10 ? lineIdx - 5 : lineIdx === 10 ? 0 : 4;
+            for (let j = 0; j < 5; j++) {
+              const i = lineIdx < 5 ? offset + j : lineIdx < 10 ? offset + j * 5 : lineIdx === 10 ? j * 6 : (4 - j) * 4 + j;
+              if (arr[i] === sym) highlightIndices.push(i);
             }
-            return false;
+            total += base * mult;
+          }
         }
-        return item.y <= canvas.height;
-    });
+      });
 
-    if (isDadang) {
-        dadangStatus.textContent = '따당 ON!';
-        dadangTimer--;
-        if (dadangTimer <= 0) {
-            isDadang = false;
-            dadangStatus.textContent = '';
+      coins += total;
+      updateStats();
+      document.getElementById("result").textContent = total > 0 ? `당첨 ${total} 코인!` : "꽝입니다!";
+    highlightWinningSymbols(highlightIndices);
+      stopSound.currentTime = 0;
+      stopSound.play();
+      if (total > 0) { winSound.currentTime = 0; winSound.play(); }
+
+      if (spinCount === 10) {
+        spinCount = 0;
+        round++;
+        if (round > 5) {
+          const name = prompt("최종 닉네임 입력:");
+          document.getElementById("ranking").innerHTML = `<h3>${name}님의 최종 코인: ${coins.toLocaleString()}원</h3><button onclick="location.reload()">재시작</button>`;
+          return;
         }
+      }
+      if (auto) setTimeout(handleSpin, 1500);
     }
 
-    ctx.fillStyle = 'white';
-    ctx.font = '30px Arial';
-    ctx.fillText('매출: ' + score + '원', 20, 40);
-    ctx.fillText('남은 시간: ' + Math.floor(timeLeft), 20, 80);
-}
-
-function gameLoop() {
-    updateGameSpeed();
-    update();
-}
-
-function startGame() {
-    document.getElementById('start-menu').style.display = 'none';
-    canvas.style.display = 'block';
-    gameInterval = setInterval(gameLoop, 30);
-    spawnInterval = setInterval(spawnItem, 700);
-    countdownInterval = setInterval(() => {
-        timeLeft--;
-        if (timeLeft <= 0) endGame();
-    }, 1000);
-}
-
-function endGame() {
-    clearInterval(gameInterval);
-    clearInterval(spawnInterval);
-    clearInterval(countdownInterval);
-    overlay.style.display = 'block';
-    finalScoreDiv.textContent = '최종 매출: ' + score + '원';
-    loadRanking();
-}
-
-function restartGame() {
-    fox.x = 360;
-    score = 0;
-    timeLeft = 60;
-    gameSpeed = baseSpeed;
-    isDadang = false;
-    dadangTimer = 0;
-    items = [];
-    overlay.style.display = 'none';
-    startGame();
-}
-
-function saveRanking(nickname, score) {
-    let ranking = JSON.parse(localStorage.getItem('ranking') || '[]');
-    ranking.push({ nickname, score });
-    ranking.sort((a, b) => b.score - a.score);
-    ranking = ranking.slice(0, 10);
-    localStorage.setItem('ranking', JSON.stringify(ranking));
-}
-
-function loadRanking() {
-    let ranking = JSON.parse(localStorage.getItem('ranking') || '[]');
-    rankingList.innerHTML = '';
-    ranking.forEach(entry => {
-        let li = document.createElement('li');
-        li.textContent = `${entry.nickname}: ${entry.score}원`;
-        rankingList.appendChild(li);
-    });
-}
-
-canvas.addEventListener('touchmove', e => {
-    fox.x = e.touches[0].clientX - fox.width / 2;
-});
-
-restartBtn.addEventListener('click', restartGame);
-submitBtn.addEventListener('click', () => {
-    const nickname = nicknameInput.value.trim() || '익명';
-    saveRanking(nickname, score);
-    loadRanking();
-    nicknameInput.value = '';
-});
-
-shortBtn.addEventListener('click', () => {
-    baseSpeed = 2;
-    startGame();
-});
-
-longBtn.addEventListener('click', () => {
-    baseSpeed = 8;
-    startGame();
-});
-</script>
+    updateStats();
+  </script>
 </body>
 </html>
