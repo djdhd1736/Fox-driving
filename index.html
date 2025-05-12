@@ -132,6 +132,7 @@
 <div class="slot-container" id="grid"></div>
   <button onclick="handleSpin()">돌리기</button>
   <button onclick="toggleAuto()">자동: <span id="autotext">OFF</span></button>
+  <button onclick="usePremium()">프리미엄 배정권 사용</button>
   <div id="result"></div>
   <h3>실시간 랭킹</h3><div id="ranking-list"></div>
 <div id="ranking"></div>
@@ -151,7 +152,7 @@
       "티맵": "https://i.imgur.com/gVK4vgP.jpeg"
     };
     const symbols = Object.keys(symbolData);
-    const roundCosts = {1:0,2:20000,3:30000,4:40000,5:50000};
+    const roundCosts = {1:0,2:20000,3:100000,4:300000,5:1000000};
 
     let coins = 5000;
     let freespins = 0;
@@ -159,6 +160,8 @@
     let spinCount = 0;
     let auto = false;
     let activeItemEffects = [];
+let premiumUses = 5;
+let premiumActive = false;
 
     
     const spinSound = document.getElementById("spinSound");
@@ -190,8 +193,18 @@ function highlightWinningSymbols(indices) {
 function updateStats() {
       document.getElementById("coins").textContent = coins;
       document.getElementById("freespins").textContent = freespins;
-      document.getElementById("round").textContent = round;
+      document.getElementById("stats").innerHTML = `코인: <span id="coins">${coins}</span> | 프리턴: <span id="freespins">${freespins}</span> | 라운드: <span id="round">${round}</span> | 프리미엄: ${premiumUses}회`;
     }
+
+    
+    function usePremium() {
+      if (premiumUses <= 0) return alert("프리미엄 사용 가능 횟수가 없습니다!");
+      premiumActive = true;
+      premiumUses--;
+      alert("다음 스핀에 10배 보상이 적용됩니다!");
+      updateStats();
+    }
+
 
     function toggleAuto() {
       auto = !auto;
@@ -223,6 +236,8 @@ function updateStats() {
         const cost = roundCosts[round] || 0;
         if (coins < cost) return alert(`라운드 ${round} 진입 실패. 코인 부족`);
         coins -= cost;
+        premiumUses = 5;
+        premiumActive = false;
         selectItem();
       }
 
@@ -336,7 +351,11 @@ lines.forEach((line, lineIdx) => {
     highlightIndices.push(...localHighlight);
   }
 });
-coins += total;
+if (premiumActive) {
+    total *= 10;
+    premiumActive = false;
+  }
+  coins += total;
 
       updateStats();
 
