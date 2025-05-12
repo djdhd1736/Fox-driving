@@ -140,9 +140,9 @@ function updateStats() {
 
     function selectItem() {
       const itemPool = [
-        { name:"복귀콜 확률 +5%", type:"probability", symbol:"복귀콜", boost:0.05 },
+        { name:"복귀콜 확률 +50%", type:"probability", symbol:"복귀콜", boost:0.5 },
         { name:"진상콜 등장 -50%", type:"probability", symbol:"진상콜", boost:-0.5 },
-        { name:"착변 보상 +50%", type:"reward", symbol:"착변콜", multiplier:1.5 },
+        { name:"착변 보상 +150%", type:"reward", symbol:"착변콜", multiplier:3 },
         { name:"보너스 프리턴 +1", type:"freespin", symbol:"보너스", bonus:1 }
       ];
       let msg = `라운드 ${round} 아이템 선택\n`;
@@ -166,7 +166,7 @@ function updateStats() {
       }
 
       if (freespins > 0) freespins--;
-      else if (coins >= 1000) coins -= 1000;
+      else if (coins >= 500) coins -= 500;
       
 else {
   auto = false;
@@ -224,7 +224,7 @@ else {
         line.forEach(sym => count[sym] = (count[sym]||0)+1);
         for (let sym in count) {
           if (count[sym] >= 3) {
-            let base = sym==="복귀콜"?2000 : sym==="보너스"?1000 : sym==="진상콜"?-1000 : 800;
+            let base = sym==="복귀콜"?3000 : sym==="보너스"?3000 : sym==="진상콜"?-1000 : 800;
             let mult = count[sym]===3?2 : count[sym]===4?3 : 4;
             activeItemEffects.forEach(eff => {
               if (eff.type === "reward" && eff.symbol === sym) mult *= eff.multiplier;
